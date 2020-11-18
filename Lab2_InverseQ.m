@@ -1,7 +1,7 @@
 clear
 %\\\\\\\\\\\\\\\\\\\\\\\\\\\\\Forward Model\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 %---------------------Theta Values-----------------------------------------
-Theta=[170 26 -98 11 2];
+Theta=[20 70 -40 -40 2];
 delta = 90;
 %--------------------Calculate Q-------------------------------------------
 a = Theta(3)+Theta(4)+delta; %arbritrary constant for simplicity
@@ -22,7 +22,6 @@ fprintf(['|    %d   |    %d   |    %d   |    %d   |    %d   |\n']...
     ,Theta(1),Theta(2),Theta(3),Theta(4),Theta(5));
 %\\\\\\\\\\\\\\\\\\\\\\\\\\\\\Inverse Model\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 %------------------------Current Bounds------------------------------------
-%sind(theta1+theta2) != 90 Deg +-180
 %sind(theta3+theta4+delta) != 90 Deg +-180
 %---------------------End Effector Values----------------------------------
 %{
@@ -56,8 +55,14 @@ for i=1:8
     k=fix((i+3)/4);
     EE(i,1)=2*atan2d((-V+((-1)^i)*sqrt(V^2+(U+W)*(U-W))),(-U-W)); %theta1
     EE(i,2)=atan2d(((-1)^j)*Q(2,3),((-1)^j)*Q(1,3))-EE(i,1); %theta2
-    %Where sind(theta1+theta2) != 90 Deg +-180 for gamma:
-    EE(i,6)=(Q(1,4)-98*cosd(EE(i,1)))/(cosd(EE(i,1)+EE(i,2))); %gamma 
+    %to calculate gamma we alternate b/w equations obtained from the Q
+    %matrix depending on if it will lead to an error. A similar strategy is
+    %used in solving theta4.
+    if cos_error(EE(i,1),EE(i,2))==1
+        EE(i,6)=(Q(2,4)-98*sind(EE(i,1)))/(sind(EE(i,1)+EE(i,2))); %gamma 
+    else 
+        EE(i,6)=(Q(1,4)-98*cosd(EE(i,1)))/(cosd(EE(i,1)+EE(i,2))); %gamma 
+    end
     EE(i,7)=11520-120*EE(i,6); %A
     EE(i,8)=18840-120*Q(3,4); %B
     EE(i,9)=-(EE(i,6)^2)+192*EE(i,6)-(Q(3,4))^2+314*Q(3,4)-25365; %C
@@ -72,8 +77,13 @@ for i=1:8
     end
     %Knowing theta1-3 we can calculate a singular theta4/5 pair for every
     %solution calculated so far, and thus we end up with 8 solutions.
-    %Where sind(theta1+theta2) != 90 Deg +-180 for theta4 calculated below:
-    EE(i,4)=atan2d(Q(1,3)/cosd(EE(i,1)+EE(i,2)),(-Q(3,3)))-EE(i,3)-delta;
+    if cos_error(EE(i,1),EE(i,2))==1
+        EE(i,4)=atan2d(Q(2,3)/sind(EE(i,1)+EE(i,2)),(-Q(3,3)))-EE(i,3)...
+            -delta;
+    else
+        EE(i,4)=atan2d(Q(1,3)/cosd(EE(i,1)+EE(i,2)),(-Q(3,3)))-EE(i,3)...
+            -delta;
+    end
     EE(i,5)=atan2d(-Q(3,2)/(sind(EE(i,3)+EE(i,4)+delta)),...
         Q(3,1)/(sind(EE(i,3)+EE(i,4)+delta)));
 end
@@ -105,3 +115,22 @@ end
 %----------Final end effector location and angles--------------------------
 disp('| Theta1I | Theta2I | Theta3I | Theta4I | Theta5I |');
 disp(EEO);
+
+%///////////////////////////Functions//////////////////////////////////////
+function ce=cos_error(t1,t2)
+    ce=0;
+    for n=-10:10
+        if t1+t2==90+n*180
+            ce=1;
+        end
+    end
+end
+
+function se=sin_error(t1,t2)
+    se=0;
+    for n=-10:10
+        if t1+t2==n*180
+            se=1;
+        end
+    end
+end
